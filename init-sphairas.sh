@@ -4,13 +4,15 @@ set -e
 
 #Prefix für die Subdomain
 PREFIX=listen
-UPSTREAM_HOST=${HOSTNAME}
-UPSTREAM_PORT=10080
-#Apache2 Virtual Host
+
+#Apache 2 Virtual Host Datei
 SITE=999-sphairas-vhost
 
-#Docker Compose
-#install Docker Compose if not installed
+#Host und Port für das Webmodule, Upstream für Apache 2 Proxy
+UPSTREAM_HOST=${HOSTNAME}
+UPSTREAM_PORT=10080
+
+#Docker Compose installieren, falls nicht schon vorhanden
 #https://docs.docker.com/compose/install/
 DOCKER_COMPOSE_BINARY=/usr/local/bin/docker-compose
 if [ ! -f ${DOCKER_COMPOSE_BINARY} ]; then 
@@ -22,19 +24,20 @@ if [ ! -f ${DOCKER_COMPOSE_BINARY} ]; then
 fi
 
 SPHAIRAS_HOSTNAME=${HOSTNAME}
-echo "Wird die Client-Anwendung für die Administration den Server unter ${HOSTNAME}:4848 und ${HOSTNAME}:7781 erreichen?"
+echo "Wird die Client-Anwendung für die Administration den IServ unter ${HOSTNAME}:4848 und ${HOSTNAME}:7781 erreichen?"
 read -p "Sie können einen anderen Hostnamen angeben oder diesen Schritt überspringen:" ALT_HOST
 if [ x${ALT_HOST} != x ]; then
     SPHAIRAS_HOSTNAME=${ALT_HOST}
 fi
 
-#generate random passwords for mysql
-MYSQL_ROOT_PASSWORD_GENERATED=`openssl rand -base64 16`
+#generate random password for mysql
 MYSQL_DB_PASSWORD_GENERATED=`openssl rand -base64 16`
 
 #Verzeichnis für Docker Compose einrichten
 SPHAIRAS_INSTALL=/etc/sphairas
-echo "Es wird eine Konfigurationsdatei für Docker Compose ${SPHAIRAS_INSTALL}/docker-compose.yml angelegt. Es werden Datei mit Umgebungsvariablen für Docker Compose ${SPHAIRAS_INSTALL}/docker.env und ${SPHAIRAS_INSTALL}/.env angelegt." 
+
+echo "Es wird eine Konfigurationsdatei für Docker Compose ${SPHAIRAS_INSTALL}/docker-compose.yml \
+und eine Datei mit Umgebungsvariablen für Docker Compose ${SPHAIRAS_INSTALL}/docker.env angelegt." 
 
 mkdir ${SPHAIRAS_INSTALL}
 
@@ -44,7 +47,7 @@ services:
   app:
     image: "sphairas/server:latest"
     ports:
-      - "8080:8080"
+      - "${UPSTREAM_PORT}:8080"
       - "7781:7781"
       - "8181:8181"
     volumes:
@@ -53,11 +56,12 @@ services:
     depends_on:
       - db
     environment:
+      - "WEB_MODULE_AUTHENTICATION=iserv"
       - "DB_HOST=db"
       - "DB_PORT=3306"
       - "DB_NAME=sphairas"
       - "DB_USER=sphairas"
-      - "DB_PASSWORD=${DB_PASSWORD}"
+      - "DB_PASSWORD=${MYSQL_DB_PASSWORD_GENERATED}"
     env_file:
       - "docker.env"
   db:
@@ -65,13 +69,17 @@ services:
     volumes:
       - "mysql-data:/var/lib/mysql"
     environment:
+      - "MYSQL_RANDOM_ROOT_PASSWORD=yes"
       - "MYSQL_DATABASE=sphairas"
       - "MYSQL_USER=sphairas"
+      - "MYSQL_PASSWORD=${MYSQL_DB_PASSWORD_GENERATED}"
 volumes:
   app-resources:
   secrets:
   mysql-data:
 EOF
+
+chmod 0400 ${SPHAIRAS_INSTALL}/docker-compose.yml
 
 cat > ${SPHAIRAS_INSTALL}/docker.env <<EOF
 #Example docker environment file
@@ -89,37 +97,18 @@ SPHAIRAS_PROVIDER=${HOSTNAME}
 #In many cases, this will the host name. 
 LOGINDOMAIN=${HOSTNAME}
 
-#Either file or iserv are supported
-WEB_MODULE_AUTHENTICATION=iserv
-
 #Hostname used for the admin certificate: 
 #This should correspond to an external name of the machine
 #on which the server is running. The application must
 #be reachable by this name from the admin client applications.
 SPHAIRAS_HOSTNAME=${SPHAIRAS_HOSTNAME}
 
-#MySql user password:
-DB_PASSWORD=${MYSQL_DB_PASSWORD_GENERATED}
-
 #IServ-Authentication
 ISERV_IMAP_HOST=${HOSTNAME}
 ISERV_IMAP_PORT=993
 EOF
 
-cat > ${SPHAIRAS_INSTALL}/.env <<EOF
-#Example docker environment file
-#Copy this to ".env" and adjust values.
-#This .env file may be deleted after the creation
-#of the mysql container
-
-#mysql root password set at first startup 
-#of the mysql container
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD_GENERATED}
-
-#mysql user password corresponding to the same
-#variable in docker.env
-DB_PASSWORD=${MYSQL_DB_PASSWORD_GENERATED}
-EOF
+chmod 0400 ${SPHAIRAS_INSTALL}/docker.env
 
 #Apache2 Virtual Host für die Subdomäne einrichten
 echo "Es wird ein virtueller Host ${PREFIX}.${HOSTNAME} in Apache 2 eingerichtet und gestartet."
@@ -171,6 +160,5 @@ echo "Apache 2 wird neu gestartet."
 a2ensite ${SITE}
 service apache2 reload
 
-echo "Fertig. Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"."
-echo "Die Datei \"${SPHAIRAS_INSTALL}/.env\" sollte nach dem ersten erfolgreichen Start wieder gelöscht werden." 
+echo "Fertig. Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
 
