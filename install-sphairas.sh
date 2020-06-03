@@ -9,8 +9,10 @@ PREFIX=listen
 SITE=999-sphairas-vhost
 
 #Host und Port für das Webmodule, Upstream für Apache 2 Proxy
-UPSTREAM_HOST=${HOSTNAME}
+UPSTREAM_HOST=localhost
 UPSTREAM_PORT=10080
+
+BASE_HOSTNAME=`echo $HOSTNAME | sed -e "s/^\(iserv\.\)//"`
 
 #Docker Compose installieren, falls nicht schon vorhanden
 #https://docs.docker.com/compose/install/
@@ -23,8 +25,8 @@ if [ ! -f ${DOCKER_COMPOSE_BINARY} ]; then
     echo "Docker Compose installiert in ${DOCKER_COMPOSE_BINARY}."
 fi
 
-SPHAIRAS_HOSTNAME=${HOSTNAME}
-echo "Wird die Client-Anwendung für die Administration den IServ unter ${HOSTNAME}:4848 und ${HOSTNAME}:7781 erreichen?"
+SPHAIRAS_HOSTNAME=${BASE_HOSTNAME}
+echo "Wird die Client-Anwendung für die Administration den IServ unter ${BASE_HOSTNAME}:4848 und ${BASE_HOSTNAME}:7781 erreichen?"
 read -p "Sie können einen anderen Hostnamen angeben oder diesen Schritt überspringen:" ALT_HOST
 if [ x${ALT_HOST} != x ]; then
     SPHAIRAS_HOSTNAME=${ALT_HOST}
@@ -90,12 +92,12 @@ cat > ${SPHAIRAS_INSTALL}/docker.env <<EOF
 #identify different providers/server instances.
 #It also identifies several configurable provider services.
 #Choose a unique domain name-like name for every provider. 
-SPHAIRAS_PROVIDER=${HOSTNAME}
+SPHAIRAS_PROVIDER=${BASE_HOSTNAME}
 
 #A domain name-like name used as user suffix for login:
 #Its value depends on the login method and the provider.
 #In many cases, this will the host name. 
-LOGINDOMAIN=${HOSTNAME}
+LOGINDOMAIN=${BASE_HOSTNAME}
 
 #Hostname used for the admin certificate: 
 #This should correspond to an external name of the machine
@@ -111,14 +113,14 @@ EOF
 chmod 0400 ${SPHAIRAS_INSTALL}/docker.env
 
 #Apache2 Virtual Host für die Subdomäne einrichten
-echo "Es wird ein virtueller Host ${PREFIX}.${HOSTNAME} in Apache 2 eingerichtet und gestartet."
+echo "Es wird ein virtueller Host ${PREFIX}.${BASE_HOSTNAME} in Apache 2 eingerichtet und gestartet."
 
 cat > /etc/apache2/sites-available/${SITE}.conf <<EOF
 SSLStrictSNIVHostCheck on
 
 <VirtualHost *:443>
 
-    ServerName ${PREFIX}.${HOSTNAME}
+    ServerName ${PREFIX}.${BASE_HOSTNAME}
 
     SSLEngine On
     SSLCertificateFile /etc/letsencrypt/live/iserv/cert.pem 	
@@ -144,21 +146,22 @@ SSLStrictSNIVHostCheck on
 
 <VirtualHost *:80>
 
-   ServerName ${PREFIX}.${HOSTNAME}
+   ServerName ${PREFIX}.${BASE_HOSTNAME}
 
-   Redirect permanent / https://${PREFIX}.${HOSTNAME}
+   Redirect permanent / https://${PREFIX}.${BASE_HOSTNAME}
 
 </VirtualHost>
 EOF
 
-echo "Der virtuelle Host ${PREFIX}.${HOSTNAME} wird in die Liste der Hostnamen für das Letsencryt-Zertifikat eingetragen."
-echo "${PREFIX}.${HOSTNAME}" >> /etc/iserv/ssl-domains
+a2ensite ${SITE}
+
+echo "Der virtuelle Host ${PREFIX}.${BASE_HOSTNAME} wird in die Liste der Hostnamen für das Letsencryt-Zertifikat eingetragen."
+echo "${PREFIX}.${BASE_HOSTNAME}" >> /etc/iserv/ssl-domains
 iconf save /etc/iserv/ssl-domains
+#lädt Apache 2 neu
 chkcert -l
 
-echo "Apache 2 wird neu gestartet."
-a2ensite ${SITE}
-service apache2 reload
+#service apache2 reload
 
 echo "Fertig. Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
 
