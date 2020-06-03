@@ -45,7 +45,7 @@ cat > ${SPHAIRAS_INSTALL}/docker-compose.yml <<EOF
 version: '3.3'
 services:
   app:
-    image: "sphairas/server:latest"
+    image: "sphairas/server:dev"
     ports:
       - "${UPSTREAM_PORT}:8080"
       - "7781:7781"
