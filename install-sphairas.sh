@@ -249,4 +249,3 @@ iservchk
 echo
 echo "Fertig"
 echo "Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
-
