@@ -205,6 +205,7 @@ if ! grep -q -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
 fi
 
 openLANPorts(){
+echo "Es wird ein neuer Eintrag in der Firewall-Konfiguration angelegt."
 cat >> /etc/ferm.d/80local.conf <<EOF
 ###Begin-sphairas Open ports for sphairas admin clients
 domain(ip ip6) {
@@ -245,6 +246,7 @@ echo "Starte iservchk. Bitte die Ausgabe beachten."
 set +e
 iservchk
 
+echo
 echo "Fertig"
 echo "Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
 
