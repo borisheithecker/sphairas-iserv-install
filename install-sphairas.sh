@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Installation von sphairas in IServ."
+echo
+
 set -e
 
 #Prefix für die Subdomain
@@ -28,12 +31,16 @@ if [ ! -f ${DOCKER_COMPOSE_BINARY} ]; then
     echo "Docker Compose installiert in ${DOCKER_COMPOSE_BINARY}."
 fi
 
+echo
+
 SPHAIRAS_HOSTNAME=${BASE_HOSTNAME}
-echo "Wird die Client-Anwendung für die Administration den IServ unter ${BASE_HOSTNAME}:4848 und ${BASE_HOSTNAME}:7781 erreichen?"
+echo "Können die Administrations-Clients den IServ unter ${BASE_HOSTNAME} erreichen?"
 read -p "Sie können einen anderen Hostnamen angeben oder diesen Schritt überspringen: " ALT_HOST
 if [ x${ALT_HOST} != x ]; then
     SPHAIRAS_HOSTNAME=${ALT_HOST}
 fi
+
+echo
 
 #generate random password for mysql
 #MYSQL_DB_PASSWORD_GENERATED=(`date | md5sum`)
@@ -42,8 +49,8 @@ MYSQL_DB_PASSWORD_GENERATED=`pwgen 24 1`
 #Verzeichnis für Docker Compose einrichten
 SPHAIRAS_INSTALL=/etc/sphairas
 
-echo "Es wird eine Konfigurationsdatei für Docker Compose ${SPHAIRAS_INSTALL}/docker-compose.yml \
-und eine Datei mit Umgebungsvariablen für Docker Compose ${SPHAIRAS_INSTALL}/docker.env angelegt." 
+echo "Es werden eine Konfigurationsdatei für Docker Compose ${SPHAIRAS_INSTALL}/docker-compose.yml \
+und eine Datei mit Umgebungsvariablen ${SPHAIRAS_INSTALL}/docker.env angelegt." 
 
 mkdir ${SPHAIRAS_INSTALL}
 
@@ -140,6 +147,8 @@ EOF
 
 chmod 0400 ${SPHAIRAS_INSTALL}/docker.env
 
+echo
+
 #Apache2 Virtual Host für die Subdomäne einrichten
 echo "Es wird ein virtueller Host ${PREFIX}.${BASE_HOSTNAME} in Apache 2 eingerichtet und gestartet."
 
@@ -185,6 +194,8 @@ EOF
 
 #enable virtual host
 a2ensite ${SITE}
+
+echo
 
 if ! grep -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
     echo "Der virtuelle Host ${PREFIX}.${BASE_HOSTNAME} wird in die Liste der Hostnamen für das Letsencryt-Zertifikat eingetragen."
@@ -234,5 +245,7 @@ chmod +x ${DOCKER_COMPOSE_BINARY}
 #iservchk, damit alles passt
 iservchk
 
-echo "Fertig. Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
+echo "Fertig"
+echo
+echo "Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
 
