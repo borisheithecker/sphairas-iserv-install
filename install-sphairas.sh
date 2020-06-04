@@ -202,8 +202,6 @@ if ! grep -q -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
     iconf save /etc/iserv/ssl-domains
     #lädt u. a. Apache 2 neu
     chkcert -l
-else
-    service apache2 reload  
 fi
 
 openLANPorts(){
@@ -234,7 +232,7 @@ domain(ip ip6) {
 EOF
 }
 
-read -p "Sollen die Ports ${SPHAIRAS_ADMIN_PORT} und ${SPHAIRAS_ADMIN_MQ_PORT} für lokale Verbindungen geöffnet werden? (Ja/Nein) " JN
+read -p "Die Ports ${SPHAIRAS_ADMIN_PORT} und ${SPHAIRAS_ADMIN_MQ_PORT} müssen für lokale Verbindungen geöffnet sein. Firewall anpassen? (Ja/Nein) " JN
     if [ ${JN} == 'Ja' ]; then
         openLANPorts
         iconf save /etc/ferm.d/80local.conf
@@ -244,7 +242,7 @@ chmod +x ${DOCKER_COMPOSE_BINARY}
 echo
 echo "Starte iservchk. Bitte die Ausgabe beachten."
 
-set -e
+set +e
 iservchk
 
 echo "Fertig"
