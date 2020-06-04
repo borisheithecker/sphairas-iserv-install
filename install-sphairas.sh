@@ -241,7 +241,10 @@ read -p "Sollen die Ports ${SPHAIRAS_ADMIN_PORT} und ${SPHAIRAS_ADMIN_MQ_PORT} f
     fi 
 chmod +x ${DOCKER_COMPOSE_BINARY}
 
-#iservchk, damit alles passt
+echo
+echo "Starte iservchk. Bitte die Ausgabe beachten."
+
+set -e
 iservchk
 
 echo "Fertig"
