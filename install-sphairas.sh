@@ -196,7 +196,7 @@ a2ensite ${SITE}
 
 echo
 
-if ! grep -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
+if ! grep -q -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
     echo "Der virtuelle Host ${PREFIX}.${BASE_HOSTNAME} wird in die Liste der Hostnamen für das Letsencryt-Zertifikat eingetragen."
     echo "${PREFIX}.${BASE_HOSTNAME}" >> /etc/iserv/ssl-domains
     iconf save /etc/iserv/ssl-domains
@@ -218,7 +218,7 @@ domain(ip ip6) {
     #          available to LAN clients.
     chain input_lan {
       # We don't offer IPv6 for LAN clients yet
-      @if @eq($DOMAIN, ip) {
+      @if @eq(\$DOMAIN, ip) {
         proto tcp dport (${SPHAIRAS_ADMIN_PORT} ${SPHAIRAS_ADMIN_MQ_PORT}) ACCEPT;
       }
     }
