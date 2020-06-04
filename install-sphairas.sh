@@ -1,7 +1,6 @@
 #!/bin/bash
 
 echo "Installation von sphairas in IServ."
-echo
 
 set -e
 
@@ -52,7 +51,7 @@ SPHAIRAS_INSTALL=/etc/sphairas
 echo "Es werden eine Konfigurationsdatei für Docker Compose ${SPHAIRAS_INSTALL}/docker-compose.yml \
 und eine Datei mit Umgebungsvariablen ${SPHAIRAS_INSTALL}/docker.env angelegt." 
 
-mkdir ${SPHAIRAS_INSTALL}
+mkdir -p ${SPHAIRAS_INSTALL}
 
 GATEWAY=172.0.0.1
 #Wir müssen ein Gateway für das Docker-Netzwerk definieren. 
