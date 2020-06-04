@@ -12,6 +12,9 @@ SITE=999-sphairas-vhost
 UPSTREAM_HOST=localhost
 UPSTREAM_PORT=10080
 
+SPHAIRAS_ADMIN_PORT=8181
+SPHAIRAS_ADMIN_MQ_PORT=7781
+
 BASE_HOSTNAME=`echo $HOSTNAME | sed -e "s/^\(iserv\.\)//"`
 
 #Docker Compose installieren, falls nicht schon vorhanden
@@ -27,13 +30,14 @@ fi
 
 SPHAIRAS_HOSTNAME=${BASE_HOSTNAME}
 echo "Wird die Client-Anwendung für die Administration den IServ unter ${BASE_HOSTNAME}:4848 und ${BASE_HOSTNAME}:7781 erreichen?"
-read -p "Sie können einen anderen Hostnamen angeben oder diesen Schritt überspringen:" ALT_HOST
+read -p "Sie können einen anderen Hostnamen angeben oder diesen Schritt überspringen: " ALT_HOST
 if [ x${ALT_HOST} != x ]; then
     SPHAIRAS_HOSTNAME=${ALT_HOST}
 fi
 
 #generate random password for mysql
-MYSQL_DB_PASSWORD_GENERATED=`openssl rand -base64 16`
+#MYSQL_DB_PASSWORD_GENERATED=(`date | md5sum`)
+MYSQL_DB_PASSWORD_GENERATED=`pwgen 24 1`
 
 #Verzeichnis für Docker Compose einrichten
 SPHAIRAS_INSTALL=/etc/sphairas
@@ -43,15 +47,28 @@ und eine Datei mit Umgebungsvariablen für Docker Compose ${SPHAIRAS_INSTALL}/do
 
 mkdir ${SPHAIRAS_INSTALL}
 
+GATEWAY=172.0.0.1
+#Wir müssen ein Gateway für das Docker-Netzwerk definieren. 
+#Das geht nur mit der älteren Docker Compose-Version 2.4.
+#Grund: Der IMAPS-Client für die Benutzerauthentifizierung kann den IServ-Host (aufgrund der 
+#Firewall-Einstellungen?) aus dem Container nicht unter $HOSTNAME erreichen. ($HOSTNAME wird als 
+#externe IP aufgelöst und gilt dann als Verbindung nach außen?)
+#Alternative zur Nutzung von 2.4: 
+#- Firewall-Einstellungen anpassen?
+#- Assigned container gateway beim Start-Up auslesen?
+#- Docker-Netzwerk separat vor Docker Compose einrichten?
+#version: '3.3' does not support extended IPAM configs
 cat > ${SPHAIRAS_INSTALL}/docker-compose.yml <<EOF
-version: '3.3'
+version: '2.4'
 services:
   app:
     image: "sphairas/server:dev"
+    networks: 
+      - sphairas_default
     ports:
       - "${UPSTREAM_PORT}:8080"
-      - "7781:7781"
-      - "8181:8181"
+      - "${SPHAIRAS_ADMIN_MQ_PORT}:7781"
+      - "${SPHAIRAS_ADMIN_PORT}:8181"
     volumes:
       - "app-resources:/app-resources/"
       - "secrets:/run/secrets/"
@@ -68,6 +85,8 @@ services:
       - "docker.env"
   db:
     image: "mysql:5.7.30"
+    networks: 
+      - sphairas_default
     volumes:
       - "mysql-data:/var/lib/mysql"
     environment:
@@ -79,6 +98,15 @@ volumes:
   app-resources:
   secrets:
   mysql-data:
+networks:
+  sphairas_default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.0.0.0/24
+          ip_range: 172.0.0.0/24
+          gateway: ${GATEWAY}
+
 EOF
 
 chmod 0400 ${SPHAIRAS_INSTALL}/docker-compose.yml
@@ -106,7 +134,7 @@ LOGINDOMAIN=${BASE_HOSTNAME}
 SPHAIRAS_HOSTNAME=${SPHAIRAS_HOSTNAME}
 
 #IServ-Authentication
-ISERV_IMAP_HOST=${HOSTNAME}
+ISERV_IMAP_HOST=${GATEWAY}
 ISERV_IMAP_PORT=993
 EOF
 
@@ -116,7 +144,9 @@ chmod 0400 ${SPHAIRAS_INSTALL}/docker.env
 echo "Es wird ein virtueller Host ${PREFIX}.${BASE_HOSTNAME} in Apache 2 eingerichtet und gestartet."
 
 cat > /etc/apache2/sites-available/${SITE}.conf <<EOF
-SSLStrictSNIVHostCheck on
+#SNI checks are not required if all all hosts are secured with a single certificate
+#SNI checks have been causing errors lately
+#SSLStrictSNIVHostCheck on
 
 <VirtualHost *:443>
 
@@ -139,7 +169,7 @@ SSLStrictSNIVHostCheck on
     ProxyPassReverse /service http://${UPSTREAM_HOST}:${UPSTREAM_PORT}/service
 
     <Proxy *>
-     		Allow from all
+     		Require all granted
     </Proxy>
 
 </VirtualHost>
@@ -153,15 +183,56 @@ SSLStrictSNIVHostCheck on
 </VirtualHost>
 EOF
 
+#enable virtual host
 a2ensite ${SITE}
 
-echo "Der virtuelle Host ${PREFIX}.${BASE_HOSTNAME} wird in die Liste der Hostnamen für das Letsencryt-Zertifikat eingetragen."
-echo "${PREFIX}.${BASE_HOSTNAME}" >> /etc/iserv/ssl-domains
-iconf save /etc/iserv/ssl-domains
-#lädt Apache 2 neu
-chkcert -l
+if ! grep -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
+    echo "Der virtuelle Host ${PREFIX}.${BASE_HOSTNAME} wird in die Liste der Hostnamen für das Letsencryt-Zertifikat eingetragen."
+    echo "${PREFIX}.${BASE_HOSTNAME}" >> /etc/iserv/ssl-domains
+    iconf save /etc/iserv/ssl-domains
+    #lädt u. a. Apache 2 neu
+    chkcert -l
+else
+    service apache2 reload  
+fi
 
-#service apache2 reload
+openLANPorts(){
+cat >> /etc/ferm.d/80local.conf <<EOF
+###Begin-sphairas Open ports for sphairas admin clients
+domain(ip ip6) {
+
+  table filter {
+
+    #Allow incoming connections to TCP Ports ${SPHAIRAS_ADMIN_PORT} and ${SPHAIRAS_ADMIN_MQ_PORT}
+    #          This is used to make services running on the IServ server
+    #          available to LAN clients.
+    chain input_lan {
+      # We don't offer IPv6 for LAN clients yet
+      @if @eq($DOMAIN, ip) {
+        proto tcp dport (${SPHAIRAS_ADMIN_PORT} ${SPHAIRAS_ADMIN_MQ_PORT}) ACCEPT;
+      }
+    }
+
+     #Allow incoming connections to TCP Ports ${SPHAIRAS_ADMIN_PORT} and ${SPHAIRAS_ADMIN_MQ_PORT}   
+#    chain input_world {
+#        proto tcp dport (${SPHAIRAS_ADMIN_PORT} ${SPHAIRAS_ADMIN_MQ_PORT}) ACCEPT;
+#    }
+
+  }
+}
+###End-sphairas Open ports for sphairas admin clients
+EOF
+}
+
+read -p "Sollen die Ports ${SPHAIRAS_ADMIN_PORT} und ${SPHAIRAS_ADMIN_MQ_PORT} für lokale Verbindungen geöffnet werden? (Ja/Nein) " JN
+    if [ ${JN} == 'Ja' ]; then
+        openLANPorts
+        iconf save /etc/ferm.d/80local.conf
+    fi 
+chmod +x ${DOCKER_COMPOSE_BINARY}
+
+#iservchk, damit alles passt
+iservchk
 
 echo "Fertig. Wechseln Sie in das Verzeichnis ${SPHAIRAS_INSTALL} und starten Sie die Anwendung mit \"docker-compose up\". Stoppen Sie die Anwendung mit \"docker-compose down\"." 
 
