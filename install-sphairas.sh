@@ -4,6 +4,15 @@ echo "Installation von sphairas in IServ."
 
 set -e
 
+#Verzeichnis für Docker Compose-Dateien
+SPHAIRAS_INSTALL=/etc/sphairas
+mkdir -p ${SPHAIRAS_INSTALL}
+
+#Install-Log
+LOG=${SPHAIRAS_INSTALL}/log.txt
+
+echo "#`date`" > ${LOG}
+
 #Prefix für die Subdomain
 PREFIX=listen
 
@@ -27,6 +36,7 @@ if [ ! -f ${DOCKER_COMPOSE_BINARY} ]; then
     if [ ${JN} != 'Ja' ]; then exit 0; fi 
     curl -L "https://github.com/docker/compose/releases/download/1.25.5/docker-compose-$(uname -s)-$(uname -m)" -o ${DOCKER_COMPOSE_BINARY}
     chmod +x ${DOCKER_COMPOSE_BINARY}
+    echo "installed docker-compose ${DOCKER_COMPOSE_BINARY}" >> ${LOG}
     echo "Docker Compose installiert in ${DOCKER_COMPOSE_BINARY}."
 fi
 
@@ -45,13 +55,8 @@ echo
 #MYSQL_DB_PASSWORD_GENERATED=(`date | md5sum`)
 MYSQL_DB_PASSWORD_GENERATED=`pwgen 24 1`
 
-#Verzeichnis für Docker Compose einrichten
-SPHAIRAS_INSTALL=/etc/sphairas
-
 echo "Es werden eine Konfigurationsdatei für Docker Compose ${SPHAIRAS_INSTALL}/docker-compose.yml \
 und eine Datei mit Umgebungsvariablen ${SPHAIRAS_INSTALL}/docker.env angelegt." 
-
-mkdir -p ${SPHAIRAS_INSTALL}
 
 GATEWAY=172.0.0.1
 #Wir müssen ein Gateway für das Docker-Netzwerk definieren. 
@@ -117,6 +122,8 @@ EOF
 
 chmod 0400 ${SPHAIRAS_INSTALL}/docker-compose.yml
 
+echo "installed docker-compose.yml ${SPHAIRAS_INSTALL}/docker-compose.yml" >> ${LOG}
+
 cat > ${SPHAIRAS_INSTALL}/docker.env <<EOF
 #Example docker environment file
 #Copy this to "docker.env" and adjust values.
@@ -145,6 +152,8 @@ ISERV_IMAP_PORT=993
 EOF
 
 chmod 0400 ${SPHAIRAS_INSTALL}/docker.env
+
+echo "installed docker.env ${SPHAIRAS_INSTALL}/docker.env" >> ${LOG}
 
 echo
 
@@ -191,8 +200,12 @@ cat > /etc/apache2/sites-available/${SITE}.conf <<EOF
 </VirtualHost>
 EOF
 
+echo "installed apache-2-vhost /etc/apache2/sites-available/${SITE}.conf" >> ${LOG}
+
 #enable virtual host
 a2ensite ${SITE}
+
+echo "ran a2ensite ${SITE}" >> ${LOG}
 
 echo
 
@@ -202,6 +215,7 @@ if ! grep -q -E "^${PREFIX}.${BASE_HOSTNAME}$" /etc/iserv/ssl-domains; then
     iconf save /etc/iserv/ssl-domains
     #lädt u. a. Apache 2 neu
     chkcert -l
+    echo "added ${PREFIX}.${BASE_HOSTNAME} /etc/iserv/ssl-domains" >> ${LOG}
 fi
 
 openLANPorts(){
@@ -237,6 +251,7 @@ read -p "Die Ports ${SPHAIRAS_ADMIN_PORT} und ${SPHAIRAS_ADMIN_MQ_PORT} müssen 
     if [ ${JN} == 'Ja' ]; then
         openLANPorts
         iconf save /etc/ferm.d/80local.conf
+        echo "configured-firewall open-ports-local ${SPHAIRAS_ADMIN_PORT} ${SPHAIRAS_ADMIN_MQ_PORT}" >> ${LOG}
     fi 
 chmod +x ${DOCKER_COMPOSE_BINARY}
 
