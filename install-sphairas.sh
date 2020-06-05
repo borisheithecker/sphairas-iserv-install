@@ -9,7 +9,7 @@ SPHAIRAS_INSTALL=/etc/sphairas
 mkdir -p ${SPHAIRAS_INSTALL}
 
 #Install-Log
-LOG=${SPHAIRAS_INSTALL}/log.txt
+LOG=${SPHAIRAS_INSTALL}/install.log
 
 echo "#`date`" > ${LOG}
 
