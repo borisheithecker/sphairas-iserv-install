@@ -70,7 +70,7 @@ services:
   app:
     image: "sphairas/server:dev"
     networks: 
-      - sphairas_default
+      - default
     ports:
       - "${UPSTREAM_PORT}:8080"
       - "${SPHAIRAS_ADMIN_MQ_PORT}:7781"
@@ -92,7 +92,7 @@ services:
   db:
     image: "mysql:5.7.30"
     networks: 
-      - sphairas_default
+      - default
     volumes:
       - "mysql-data:/var/lib/mysql"
     environment:
@@ -105,7 +105,7 @@ volumes:
   secrets:
   mysql-data:
 networks:
-  sphairas_default:
+  default:
     driver: bridge
     ipam:
       config:
