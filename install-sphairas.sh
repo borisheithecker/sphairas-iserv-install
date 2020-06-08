@@ -248,12 +248,11 @@ EOF
 }
 
 read -p "Die Ports ${SPHAIRAS_ADMIN_PORT} und ${SPHAIRAS_ADMIN_MQ_PORT} müssen für lokale Verbindungen geöffnet sein. Firewall anpassen? (Ja/Nein) " JN
-    if [ ${JN} == 'Ja' ]; then
-        openLANPorts
-        iconf save /etc/ferm.d/80local.conf
-        echo "configured-firewall open-ports-local ${SPHAIRAS_ADMIN_PORT} ${SPHAIRAS_ADMIN_MQ_PORT}" >> ${LOG}
-    fi 
-chmod +x ${DOCKER_COMPOSE_BINARY}
+if [ ${JN} == 'Ja' ]; then
+    openLANPorts
+    iconf save /etc/ferm.d/80local.conf
+    echo "configured-firewall open-ports-local ${SPHAIRAS_ADMIN_PORT} ${SPHAIRAS_ADMIN_MQ_PORT}" >> ${LOG}
+fi 
 
 echo
 echo "Starte iservchk. Bitte die Ausgabe beachten."
